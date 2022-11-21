@@ -47,7 +47,9 @@ public final class Projector extends JComponent {
         new Edge(2, 6),
         new Edge(4, 7),
     };
-    private static final Comparator<Vec3> Z_COMPARATOR = Comparator.comparingDouble(vec -> vec.z);
+    private static final Comparator<Pair<Integer, Vec3>> Z_COMPARATOR =
+        Comparator.comparingDouble((Pair<Integer, Vec3> pair) -> pair.second.z)
+            .thenComparingInt(pair -> pair.first);
 
     private double angleX;
     private double angleY;
@@ -66,27 +68,29 @@ public final class Projector extends JComponent {
         Mat3 transform = Rotation.rotationX(angleX)
             .multiply(Rotation.rotationY(angleY))
             .multiply(Rotation.rotationZ(angleZ));
-        List<Vec3> transformedPoints = new ArrayList<>(POINTS.length);
+        List<Pair<Integer, Vec3>> transformedPoints = new ArrayList<>(POINTS.length);
+        int i = 0;
         for (Vec3 point : POINTS) {
-            transformedPoints.add(transform.multiply(point));
+            transformedPoints.add(new Pair<>(i++, transform.multiply(point)));
         }
-        List<Vec3> sortedTransformedPoints = new ArrayList<>(transformedPoints);
+        List<Pair<Integer, Vec3>> sortedTransformedPoints = new ArrayList<>(transformedPoints);
         sortedTransformedPoints.sort(Z_COMPARATOR);
-        SortedMap<Vec3, List<Edge>> edgesByBackmostPoint = new TreeMap<>(Z_COMPARATOR);
+        SortedMap<Pair<Integer, Vec3>, List<Edge>> edgesByBackmostPoint = new TreeMap<>(Z_COMPARATOR);
         for (Edge edge : EDGES) {
-            Vec3 first = transformedPoints.get(edge.first);
-            Vec3 second = transformedPoints.get(edge.second);
+            Pair<Integer, Vec3> first = transformedPoints.get(edge.first);
+            Pair<Integer, Vec3> second = transformedPoints.get(edge.second);
             int comparison = Integer.compare(sortedTransformedPoints.indexOf(first), sortedTransformedPoints.indexOf(second));
-            Vec3 backmost = comparison > 0 ? second : first;
+            Pair<Integer, Vec3> backmost = comparison > 0 ? second : first;
             edgesByBackmostPoint.computeIfAbsent(backmost, v -> new ArrayList<>()).add(edge);
         }
-        for (Vec3 transformed : sortedTransformedPoints) {
+        for (Pair<Integer, Vec3> transformedPair : sortedTransformedPoints) {
+            Vec3 transformed = transformedPair.second;
             float brightness = computeBrightness(transformed.z);
             Color c = new Color(0, brightness, 0);
 
-            for (Edge edge : edgesByBackmostPoint.getOrDefault(transformed, Collections.emptyList())) {
-                int otherIndex = transformedPoints.indexOf(transformed) == edge.first ? edge.second : edge.first;
-                Vec3 other = transformedPoints.get(otherIndex);
+            for (Edge edge : edgesByBackmostPoint.getOrDefault(transformedPair, Collections.emptyList())) {
+                int otherIndex = transformedPair.first == edge.first ? edge.second : edge.first;
+                Vec3 other = transformedPoints.get(otherIndex).second;
                 Color c2 = new Color(0, computeBrightness(other.z), 0);
                 h.setPaint(new GradientPaint(
                     (float) transformed.x, (float) transformed.y, c,
