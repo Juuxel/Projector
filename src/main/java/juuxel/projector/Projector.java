@@ -60,10 +60,15 @@ public final class Projector extends JComponent {
     private static final Comparator<Pair<Integer, Vec3>> Z_COMPARATOR =
         Comparator.comparingDouble((Pair<Integer, Vec3> pair) -> pair.second.z)
             .thenComparingInt(pair -> pair.first);
+    private static final Mat3 FLIP_Z = new Mat3(
+        1, 0, 0,
+        0, 1, 0,
+        0, 0, -1
+    );
 
-    private double angleX;
-    private double angleY;
-    private double angleZ;
+    private double pitch;
+    private double roll;
+    private double yaw;
 
     @Override
     protected void paintComponent(Graphics g) {
@@ -75,9 +80,7 @@ public final class Projector extends JComponent {
         Graphics2D h = (Graphics2D) g.create();
         h.translate(getWidth() / 2, getHeight() / 2);
         h.scale(50, 50);
-        Mat3 transform = Rotation.rotationX(angleX)
-            .multiply(Rotation.rotationY(angleY))
-            .multiply(Rotation.rotationZ(angleZ));
+        Mat3 transform = FLIP_Z.multiply(Rotation.asMatrix(pitch, yaw, -roll)).multiply(FLIP_Z);
         List<Pair<Integer, Vec3>> transformedPoints = new ArrayList<>(POINTS.length);
         int i = 0;
         for (Vec3 point : POINTS) {
@@ -174,17 +177,17 @@ public final class Projector extends JComponent {
             JSlider sliderX = createAngleSlider();
             JSlider sliderY = createAngleSlider();
             JSlider sliderZ = createAngleSlider();
-            sliderX.addChangeListener(e -> { projector.angleX = Math.toRadians(sliderX.getValue()); projector.repaint(); });
-            sliderY.addChangeListener(e -> { projector.angleY = Math.toRadians(sliderY.getValue()); projector.repaint(); });
-            sliderZ.addChangeListener(e -> { projector.angleZ = Math.toRadians(sliderZ.getValue()); projector.repaint(); });
+            sliderX.addChangeListener(e -> { projector.yaw = Math.toRadians(sliderX.getValue()); projector.repaint(); });
+            sliderY.addChangeListener(e -> { projector.pitch = Math.toRadians(sliderY.getValue()); projector.repaint(); });
+            sliderZ.addChangeListener(e -> { projector.roll = Math.toRadians(sliderZ.getValue()); projector.repaint(); });
 
             JPanel controlPanel = new JPanel();
             controlPanel.setLayout(new GridLayout(0, 2));
-            controlPanel.add(new JLabel("X Rotation"));
+            controlPanel.add(new JLabel("Yaw"));
             controlPanel.add(sliderX);
-            controlPanel.add(new JLabel("Y Rotation"));
+            controlPanel.add(new JLabel("Pitch"));
             controlPanel.add(sliderY);
-            controlPanel.add(new JLabel("Z Rotation"));
+            controlPanel.add(new JLabel("Roll"));
             controlPanel.add(sliderZ);
             JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, projector, controlPanel);
 
