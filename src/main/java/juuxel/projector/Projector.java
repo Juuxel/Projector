@@ -10,6 +10,7 @@ import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
+import java.awt.geom.Path2D;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -18,6 +19,7 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.stream.Stream;
 
 public final class Projector extends JComponent {
     private static final Vec3[] POINTS = {
@@ -46,6 +48,14 @@ public final class Projector extends JComponent {
         new Edge(1, 5),
         new Edge(2, 6),
         new Edge(4, 7),
+    };
+    private static final Quad[] QUADS = {
+        new Quad(0, 1, 4, 2),
+        new Quad(3, 5, 7, 6),
+        new Quad(0, 1, 5, 3),
+        new Quad(2, 4, 7, 6),
+        new Quad(0, 2, 6, 3),
+        new Quad(1, 4, 7, 5),
     };
     private static final Comparator<Pair<Integer, Vec3>> Z_COMPARATOR =
         Comparator.comparingDouble((Pair<Integer, Vec3> pair) -> pair.second.z)
@@ -83,10 +93,41 @@ public final class Projector extends JComponent {
             Pair<Integer, Vec3> backmost = comparison > 0 ? second : first;
             edgesByBackmostPoint.computeIfAbsent(backmost, v -> new ArrayList<>()).add(edge);
         }
+        SortedMap<Pair<Integer, Vec3>, List<Quad>> quadsByBackmostPoint = new TreeMap<>(Z_COMPARATOR);
+        for (Quad quad : QUADS) {
+            Pair<Integer, Vec3> backmost = Stream.of(quad.a, quad.b, quad.c, quad.d)
+                .map(transformedPoints::get)
+                .sorted(Comparator.comparing(sortedTransformedPoints::indexOf))
+                .findFirst().get();
+            quadsByBackmostPoint.computeIfAbsent(backmost, v -> new ArrayList<>()).add(quad);
+        }
         for (Pair<Integer, Vec3> transformedPair : sortedTransformedPoints) {
             Vec3 transformed = transformedPair.second;
             float brightness = computeBrightness(transformed.z);
             Color c = new Color(0, brightness, 0);
+
+            for (Quad quad : quadsByBackmostPoint.getOrDefault(transformedPair, Collections.emptyList())) {
+                Vec3 frontmost = Stream.of(quad.a, quad.b, quad.c, quad.d)
+                    .map(transformedPoints::get)
+                    .sorted(Comparator.comparing(sortedTransformedPoints::indexOf).reversed())
+                    .findFirst().get().second;
+                Color c2 = new Color(0, computeBrightness(frontmost.z), 0, 0.2f);
+                h.setPaint(new GradientPaint(
+                    (float) transformed.x, (float) transformed.y, c,
+                    (float) frontmost.x, (float) frontmost.y, c2
+                ));
+                Path2D.Double path = new Path2D.Double();
+                Vec3 va = transformedPoints.get(quad.a).second;
+                Vec3 vb = transformedPoints.get(quad.b).second;
+                Vec3 vc = transformedPoints.get(quad.c).second;
+                Vec3 vd = transformedPoints.get(quad.d).second;
+                path.moveTo(va.x, va.y);
+                path.lineTo(vb.x, vb.y);
+                path.lineTo(vc.x, vc.y);
+                path.lineTo(vd.x, vd.y);
+                path.lineTo(va.x, va.y);
+                h.fill(path);
+            }
 
             for (Edge edge : edgesByBackmostPoint.getOrDefault(transformedPair, Collections.emptyList())) {
                 int otherIndex = transformedPair.first == edge.first ? edge.second : edge.first;
@@ -164,6 +205,16 @@ public final class Projector extends JComponent {
         Edge(int first, int second) {
             this.first = first;
             this.second = second;
+        }
+    }
+
+    private static final class Quad {
+        final int a, b, c, d;
+        Quad(int a, int b, int c, int d) {
+            this.a = a;
+            this.b = b;
+            this.c = c;
+            this.d = d;
         }
     }
 }
