@@ -161,6 +161,7 @@ public final class Projector extends JComponent {
         labelTable.put(360, new JLabel("360\u00B0"));
         slider.setPaintLabels(true);
         slider.setLabelTable(labelTable);
+        slider.setValue(0);
         return slider;
     }
 
